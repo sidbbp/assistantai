@@ -3,6 +3,7 @@
   "displayName": "assistantAI",
   "description": "generate code using assistantAI",
   "version": "0.0.1",
+  "publisher": "sidbbp",
   "engines": {
     "vscode": "^1.98.0"
   },
