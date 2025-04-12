@@ -1,15 +1,20 @@
 import * as vscode from 'vscode';
-// import { createWebviewPanel } from './ui';
 import { createWebviewPanel } from './ui/webview';
 
 export function activate(context: vscode.ExtensionContext) {
     console.log("🔹 assistantAI Extension Activated");
 
-    let disposable = vscode.commands.registerCommand('assitantAI.openPanel', () => {
-        createWebviewPanel(context);
+    // Register command to open the floating panel
+    let disposablePanel = vscode.commands.registerCommand('assitantAI.openPanel', () => {
+        createWebviewPanel(context, false);  // Opens in a floating panel
     });
 
-    context.subscriptions.push(disposable);
+    // Register command to open the sidebar
+    let disposableSidebar = vscode.commands.registerCommand('assitantAI.openSidebar', () => {
+        createWebviewPanel(context, true);   // Opens in the sidebar
+    });
+
+    context.subscriptions.push(disposablePanel, disposableSidebar);
 }
 
 export function deactivate() {

@@ -2,11 +2,11 @@ import * as vscode from 'vscode';
 import { fetchAIResponse, analyzeCode } from './aiHandler';
 import { getAllFiles } from './fileUtils';
 
-export function createWebviewPanel(context: vscode.ExtensionContext) {
+export function createWebviewPanel(context: vscode.ExtensionContext, isSidebar: boolean) {
     const panel = vscode.window.createWebviewPanel(
         'assitantAIPanel',
         'AssistantAI Chat',
-        vscode.ViewColumn.One,
+        isSidebar ? vscode.ViewColumn.Beside : vscode.ViewColumn.One,
         { enableScripts: true, retainContextWhenHidden: true }
     );
 
@@ -62,7 +62,7 @@ export function createWebviewPanel(context: vscode.ExtensionContext) {
     panel.webview.postMessage({ command: 'fetchFiles' });
 }
 
-function getWebviewContent(): string {
+export function getWebviewContent(): string {
     return `
         <!DOCTYPE html>
         <html lang="en">

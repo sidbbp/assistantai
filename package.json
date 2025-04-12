@@ -2,7 +2,7 @@
   "name": "assitantai",
   "displayName": "assistantAI",
   "description": "generate code using assistantAI",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "publisher": "sidbbp",
   "engines": {
     "vscode": "^1.98.0"
@@ -11,7 +11,8 @@
     "Other"
   ],
   "activationEvents": [
-    "onCommand:assitantAI.openPanel"
+    "onCommand:assitantAI.openPanel",
+    "onCommand:assitantAI.openSidebar"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -19,6 +20,35 @@
       {
         "command": "assitantAI.openPanel",
         "title": "Generate code using assistantAI"
+      },
+      {
+        "command": "assitantAI.openSidebar",
+        "title": "Open assistantAI Chat Sidebar"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "assitantAI",
+          "title": "AssistantAI",
+          "icon": "media/icon.png"
+        }
+      ]
+    },
+    "views": {
+      "assitantAI": [
+        {
+          "id": "assitantAIPanel",
+          "name": "Chat",
+          "type": "webview"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "assitantAI.openSidebar",
+        "key": "ctrl+f10",
+        "when": "editorTextFocus"
       }
     ]
   },
