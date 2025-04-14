@@ -1,17 +1,24 @@
 import * as vscode from 'vscode';
 import { createWebviewPanel } from './ui/webview';
 
-export function activate(context: vscode.ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext) {
     console.log("🔹 assistantAI Extension Activated");
 
-    // Register command to open the floating panel
-    let disposablePanel = vscode.commands.registerCommand('assitantAI.openPanel', () => {
-        createWebviewPanel(context, false);  // Opens in a floating panel
+    const disposablePanel = vscode.commands.registerCommand('assitantAI.openPanel', async () => {
+        const currentModel = context.globalState.get<string>('selectedModel') || 'llama3.1';
+        createWebviewPanel(context, false, currentModel);
     });
 
-    // Register command to open the sidebar
-    let disposableSidebar = vscode.commands.registerCommand('assitantAI.openSidebar', () => {
-        createWebviewPanel(context, true);   // Opens in the sidebar
+    const disposableSidebar = vscode.commands.registerCommand('assitantAI.openSidebar', async () => {
+        const currentModel = context.globalState.get<string>('selectedModel') || 'llama3.1';
+        createWebviewPanel(context, true, currentModel);
+    });
+
+    vscode.window.registerWebviewPanelSerializer('assitantAIPanel', {
+        async deserializeWebviewPanel(webviewPanel: vscode.WebviewPanel, state: any) {
+            const currentModel = context.globalState.get<string>('selectedModel') || 'llama3.1';
+            createWebviewPanel(context, false, currentModel);
+        }
     });
 
     context.subscriptions.push(disposablePanel, disposableSidebar);

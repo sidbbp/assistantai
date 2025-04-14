@@ -2,7 +2,16 @@ import * as vscode from 'vscode';
 import { fetchAIResponse, analyzeCode } from './aiHandler';
 import { getAllFiles } from './fileUtils';
 
-export function createWebviewPanel(context: vscode.ExtensionContext, isSidebar: boolean) {
+let isResponseInProgress = false;
+let currentModel = 'llama3.1'; // default fallback
+
+export function createWebviewPanel(
+    context: vscode.ExtensionContext,
+    isSidebar: boolean,
+    initialModel: string = 'llama3.1'
+) {
+    currentModel = initialModel;
+
     const panel = vscode.window.createWebviewPanel(
         'assitantAIPanel',
         'AssistantAI Chat',
@@ -10,32 +19,42 @@ export function createWebviewPanel(context: vscode.ExtensionContext, isSidebar: 
         { enableScripts: true, retainContextWhenHidden: true }
     );
 
-    panel.webview.html = getWebviewContent();
+    panel.webview.html = getWebviewContent(currentModel);
 
     panel.webview.onDidReceiveMessage(
         async (message) => {
-            if (message.command === 'generateResponse') {
+            if (message.command === 'generateResponse' && !isResponseInProgress) {
+                isResponseInProgress = true;
+
                 const { prompt, selectedFile } = message;
                 console.log(`📌 Received prompt: ${prompt}`);
 
                 panel.webview.postMessage({ command: 'clearResponse' });
 
-                let responseText = "";
-                fetchAIResponse(prompt, selectedFile, (chunk, isFinal) => {
+                let responseText = '';
+                fetchAIResponse(prompt, selectedFile, currentModel, (chunk, isFinal) => {
                     responseText += chunk;
                     panel.webview.postMessage({ command: 'updateResponse', response: responseText });
+                    if (isFinal) {
+                        isResponseInProgress = false;
+                    }
                 });
 
-            } else if (message.command === 'analyzeCode') {
+            } else if (message.command === 'analyzeCode' && !isResponseInProgress) {
+                isResponseInProgress = true;
+
                 const { selectedFile } = message;
                 console.log(`🔍 Analyzing: ${selectedFile}`);
 
                 panel.webview.postMessage({ command: 'clearResponse' });
 
-                let responseText = "";
-                analyzeCode(selectedFile, (chunk, isFinal) => {
+                let responseText = '';
+                analyzeCode(selectedFile, currentModel, (chunk, isFinal) => {
                     responseText += chunk;
                     panel.webview.postMessage({ command: 'updateResponse', response: responseText });
+                    if (isFinal) {
+                        isResponseInProgress = false;
+                    }
                 });
 
             } else if (message.command === 'fetchFiles') {
@@ -53,6 +72,10 @@ export function createWebviewPanel(context: vscode.ExtensionContext, isSidebar: 
                     files = files.filter(file => file.toLowerCase().includes(query)).slice(0, 5);
                     panel.webview.postMessage({ command: 'updateFileList', files });
                 }
+            } else if (message.command === 'saveModel') {
+                currentModel = message.model;
+                await context.globalState.update("selectedModel", currentModel);
+                console.log(`💾 Saved model: ${currentModel}`);
             }
         },
         undefined,
@@ -60,14 +83,16 @@ export function createWebviewPanel(context: vscode.ExtensionContext, isSidebar: 
     );
 
     panel.webview.postMessage({ command: 'fetchFiles' });
+    panel.webview.postMessage({ command: 'updateModel', model: currentModel });
 }
 
-export function getWebviewContent(): string {
+
+export function getWebviewContent(currentModel: string): string {
     return `
         <!DOCTYPE html>
         <html lang="en">
         <head>
-            <meta charset="UTF-8">
+            <meta charset="UTF-8"> 
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>AssistantAI Chat</title>
             <style>
@@ -138,8 +163,17 @@ export function getWebviewContent(): string {
             <div class="container">
                 <h2>AssistantAI Chat</h2>
 
-                <input type="text" id="fileSearch" placeholder="Search files..." oninput="searchFiles()">
+                <label for="modelSelect">Choose AI Model:</label>
+                <select id="modelSelect">
+                    <option value="llama3.1">Llama 3.1</option>
+                    <option value="mistral">Mistral</option>
+                    <option value="gemma">Gemma</option>
+                    <option value="deepseek-r1">deepseek-r1</option>
+                    <option value="llama3.2">llama3.2</option>
+                </select>
+                <button onclick="saveModel()" style="width: 100%; margin-top: 5px;">Save Model</button>
 
+                <input type="text" id="fileSearch" placeholder="Search files..." oninput="searchFiles()">
                 <select id="fileSelect">
                     <option value="">-- No file selected --</option>
                 </select>
@@ -156,12 +190,21 @@ export function getWebviewContent(): string {
 
             <script>
                 const vscode = acquireVsCodeApi();
+                document.getElementById("modelSelect").value = "${currentModel}";
+
+                let lastAIMessage = null;
+
+                function saveModel() {
+                    const selectedModel = document.getElementById("modelSelect").value;
+                    vscode.postMessage({ command: "saveModel", model: selectedModel });
+                }
 
                 function sendMessage() {
                     const prompt = document.getElementById("userInput").value.trim();
                     const selectedFile = document.getElementById("fileSelect").value;
                     if (!prompt) return;
                     appendMessage("You", prompt, "user-message");
+                    lastAIMessage = null; // Reset before new response
                     vscode.postMessage({ command: "generateResponse", prompt, selectedFile });
                 }
 
@@ -172,6 +215,7 @@ export function getWebviewContent(): string {
                         return;
                     }
                     appendMessage("🔍 Analysis", "Analyzing code...", "ai-message");
+                    lastAIMessage = null;
                     vscode.postMessage({ command: "analyzeCode", selectedFile });
                 }
 
@@ -182,18 +226,15 @@ export function getWebviewContent(): string {
 
                 function appendMessage(sender, text, className) {
                     const chatbox = document.getElementById("chatbox");
-                    let lastMessage = chatbox.lastElementChild;
-
-                    if (lastMessage && lastMessage.classList.contains(className)) {
-                        lastMessage.innerHTML = "<strong>" + sender + ":</strong> " + text;
-                    } else {
-                        const messageElement = document.createElement("p");
-                        messageElement.innerHTML = "<strong>" + sender + ":</strong> " + text;
-                        messageElement.classList.add(className);
-                        chatbox.appendChild(messageElement);
-                    }
-
+                    const messageElement = document.createElement("p");
+                    messageElement.innerHTML = "<strong>" + sender + ":</strong> " + text;
+                    messageElement.classList.add(className);
+                    chatbox.appendChild(messageElement);
                     chatbox.scrollTop = chatbox.scrollHeight;
+
+                    if (sender === "AI" || sender === "🔍 Analysis") {
+                        lastAIMessage = messageElement;
+                    }
                 }
 
                 window.addEventListener("message", event => {
@@ -203,8 +244,15 @@ export function getWebviewContent(): string {
                             .join("");
                     } else if (event.data.command === "clearResponse") {
                         document.getElementById("chatbox").innerHTML = "";
+                        lastAIMessage = null;
                     } else if (event.data.command === "updateResponse") {
-                        appendMessage("AI", event.data.response, "ai-message");
+                        if (lastAIMessage) {
+                            lastAIMessage.innerHTML = "<strong>AI:</strong> " + event.data.response;
+                        } else {
+                            appendMessage("AI", event.data.response, "ai-message");
+                        }
+                    } else if (event.data.command === "updateModel") {
+                        document.getElementById("modelSelect").value = event.data.model;
                     }
                 });
 

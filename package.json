@@ -16,6 +16,17 @@
   ],
   "main": "./dist/extension.js",
   "contributes": {
+    "configuration": {
+        "title": "AssistantAI",
+        "properties": {
+            "assistantAI.model": {
+                "type": "string",
+                "default": "llama3.1",
+                "description": "Select the AI model to use for responses",
+                "enum": ["llama3.1", "mistral", "gemma", "deepseek-r1","llama3.2"]
+            }
+        }
+    },
     "commands": [
       {
         "command": "assitantAI.openPanel",
